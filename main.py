@@ -1,6 +1,12 @@
 import cv2
 import mediapipe as mp
 from utils import *
+from datetime import datetime
+
+now = datetime.now()
+# dd/mm/YY H:M:S
+dt_string = now.strftime("%d/%m/%Y_%H-%M-%S")
+print(dt_string)
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -23,10 +29,24 @@ yellow = (0, 255, 255)
 pink = (255, 0, 255)
 
 # For webcam input:
-cap = cv2.VideoCapture('http://10.1.18.99:4747/video')
+# cap = cv2.VideoCapture('http://10.1.18.99:4747/video')
 # cap = cv2.VideoCapture('test_video.mp4')
-# cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0)
+# Meta
 fps = int(cap.get(cv2.CAP_PROP_FPS))
+frame_width = int(cap.get(3))
+frame_height = int(cap.get(4))
+
+size = (frame_width, frame_height)
+
+# Below VideoWriter object will create
+# a frame of above defined The output
+# is stored in 'filename.avi' file.
+result = cv2.VideoWriter(f'{dt_string}.mp4',
+                         cv2.VideoWriter_fourcc(*'MP4V'),
+                         10, size)
+
+
 with mp_pose.Pose(
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5) as pose:
@@ -46,7 +66,7 @@ with mp_pose.Pose(
         # Draw the pose annotation on the image.
         image.flags.writeable = True
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-        image = cv2.resize(image, (1080, 1920))
+        # image = cv2.resize(image, (1080, 1920))
         h, w = image.shape[:2]
         mp_drawing.draw_landmarks(
             image,
@@ -80,9 +100,9 @@ with mp_pose.Pose(
             # Assist to align the camera to point at the side view of the person.
             # Offset threshold 30 is based on results obtained from analysis over 100 samples.
             if offset < 100:
-                cv2.putText(image, str(int(offset)) + ' Aligned', (w - 300, 30), font, 0.9, green, 2)
+                cv2.putText(image, str(int(offset)) + ' Aligned', (w - 240, 30), font, 0.9, green, 2)
             else:
-                cv2.putText(image, str(int(offset)) + ' Not Aligned', (w - 300, 30), font, 0.9, red, 2)
+                cv2.putText(image, str(int(offset)) + ' Not Aligned', (w - 240, 30), font, 0.9, red, 2)
 
             # Calculate angles.
             neck_inclination = findAngle(l_shldr_x, l_shldr_y, l_ear_x, l_ear_y)
@@ -104,11 +124,11 @@ with mp_pose.Pose(
 
             # Put text, Posture and angle inclination.
             # Text string for display.
-            angle_text_string = 'Neck : ' + str(int(neck_inclination)) + '  Torso : ' + str(int(torso_inclination))
+            angle_text_string = 'Neck: ' + str(int(neck_inclination)) + '  Torso: ' + str(int(torso_inclination))
 
             # Determine whether good posture or bad posture.
             # The threshold angles have been set based on intuition.
-            if neck_inclination < 10 and torso_inclination < 6:
+            if neck_inclination < 10 and torso_inclination < 12:
                 bad_frames = 0
                 good_frames += 1
 
@@ -121,6 +141,7 @@ with mp_pose.Pose(
                 cv2.line(image, (l_shldr_x, l_shldr_y), (l_shldr_x, l_shldr_y - 100), green, 4)
                 cv2.line(image, (l_hip_x, l_hip_y), (l_shldr_x, l_shldr_y), green, 4)
                 cv2.line(image, (l_hip_x, l_hip_y), (l_hip_x, l_hip_y - 100), green, 4)
+                result.write(image)
 
             else:
                 good_frames = 0
@@ -142,10 +163,10 @@ with mp_pose.Pose(
 
             # Pose time.
             if good_time > 0:
-                time_string_good = 'Good Posture Time : ' + str(round(good_time, 1)) + 's'
+                time_string_good = 'Good Posture Time: ' + str(round(good_time, 1)) + 's'
                 cv2.putText(image, time_string_good, (10, h - 20), font, 0.9, green, 2)
             else:
-                time_string_bad = 'Bad Posture Time : ' + str(round(bad_time, 1)) + 's'
+                time_string_bad = 'Bad Posture Time: ' + str(round(bad_time, 1)) + 's'
                 cv2.putText(image, time_string_bad, (10, h - 20), font, 0.9, red, 2)
 
             # If you stay in bad posture for more than 3 minutes (180s) send an alert.
@@ -158,6 +179,7 @@ with mp_pose.Pose(
         cv2.setWindowProperty(window, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
         # cv2.imshow('MediaPipe Pose', cv2.flip(image, 0))
         cv2.imshow(window, image)
+
         if cv2.waitKey(5) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
             break
